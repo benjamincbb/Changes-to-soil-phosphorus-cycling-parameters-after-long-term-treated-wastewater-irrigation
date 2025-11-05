@@ -21,6 +21,7 @@ The raw data available in this repository include the following physicochemical 
 - Alkaline phosphatase activity
 - Phosphodiesterase activity
 - Pyrophosphatase activity
+- Soil Survey data
   
 
 
