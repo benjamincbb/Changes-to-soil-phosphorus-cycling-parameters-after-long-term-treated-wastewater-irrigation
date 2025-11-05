@@ -1,0 +1,26 @@
+Pyrophosphatase activity,,,,,,,,,,,,,,,,,,
+Soil,Samples ID,Repetition,Weight (g),Weight (dry g equivalent),Volume (mL),Dilution factor,Absorbance,P-PO4 mg/L,ug P-PO4/g/ 5h,Mean,SD,ug P-PO4/g/ h,Mean,SD,,Concentration (ug),Absorbance,Absorbance correct
+Forest - TWW Control,S4,1,1.0039,,30,1,0.162,17.79518072,,,,,,,,0,0.051,0
+Forest - TWW Control,S4,2,1.0017,,30,1,0.163,17.91566265,,,,,,,,5,0.1,0.049
+Forest - Living filter TWW irrigation,S4,1,1.0112,0.7948032,30,1,0.288,32.97590361,570.7255052,576.9158204,24.10775709,114.145101,115.3831641,4.821551417,,10,0.169,0.118
+Forest - Living filter TWW irrigation,S4,2,1.0034,0.7886724,30,1,0.295,33.81927711,607.2428332,,,121.4485666,,,,20,0.242,0.191
+Forest - Living filter TWW irrigation,S4,3,1.0091,0.7931526,30,1,0.283,32.37349398,549.1278333,,,109.8255667,,,,40,0.389,0.338
+Forest - Living filter TWW irrigation,S4,4,1.0099,0.7937814,30,1,0.29,33.21686747,580.5671102,,,116.113422,,,,,,
+Forest nonirrigated Control,S5,1,1.0049,,30,1,0.058,5.265060241,,,,,,,,,,
+Forest nonirrigated Control,S5,2,1.009,,30,1,0.054,4.78313253,,,,,,,,,,
+Forest - Living filter nonirrigated,S5,1,1.0033,0.7615047,30,1,0.136,14.6626506,379.7174548,370.166519,29.47415913,75.94349096,74.0333038,5.894831827,,,,
+Forest - Living filter nonirrigated,S5,2,1.0087,0.7656033,30,1,0.141,15.26506024,401.2899574,,,80.25799149,,,,,,
+Forest - Living filter nonirrigated,S5,3,1.0075,0.7646925,30,1,0.126,13.45783133,330.8676994,,,66.17353987,,,,,,
+Forest - Living filter nonirrigated,S5,4,1.0072,0.7644648,30,1,0.134,14.42168675,368.7909644,,,73.75819288,,,,,,
+Agricultural - Living filter TWW irrigation Control,S6,1,1.0076,,30,1,0.103,10.68674699,,,,,,,,,,
+Agricultural - Living filter TWW irrigation Control,S6,2,1.0061,,30,1,0.108,11.28915663,,,,,,,,,,
+Agricultural - Living filter TWW irrigation,S6,1,1.0012,0.85102,30,1,0.233,26.34939759,541.5188521,584.8738302,36.77111396,108.3037704,116.974766,7.354222793,,,,
+Agricultural - Living filter TWW irrigation,S6,2,1.0038,0.85323,30,1,0.241,27.31325301,574.005879,,,114.8011758,,,,,,
+Agricultural - Living filter TWW irrigation,S6,3,1.0037,0.853145,30,1,0.254,28.87951807,629.1392295,,,125.8278459,,,,,,
+Agricultural - Living filter TWW irrigation,S6,4,1.0044,0.85374,30,1,0.246,27.91566265,594.83136,,,118.966272,,,,,,
+Agricultural - Living filter nonirrigated  Control,S7,1,1.0025,,30,1,0.086,8.638554217,,,,,,,,,,
+Agricultural - Living filter nonirrigated Control,S7,2,1.0047,,30,1,0.084,8.397590361,,,,,,,,,,
+Agricultural - Living filter nonirrigated,S7,1,1.0099,0.8129695,30,1,0.215,24.18072289,577.9792699,586.9607179,24.61715799,115.595854,117.3921436,4.923431599,,,,
+Agricultural - Living filter nonirrigated,S7,2,1.0079,0.8113595,30,1,0.219,24.6626506,596.9454347,,,119.3890869,,,,,,
+Agricultural - Living filter nonirrigated,S7,3,1.0074,0.810957,30,1,0.223,25.14457831,615.0698258,,,123.0139652,,,,,,
+Agricultural - Living filter nonirrigated,S7,4,1.0061,0.8099105,30,1,0.21,23.57831325,557.8483412,,,111.5696682,,,,,,
