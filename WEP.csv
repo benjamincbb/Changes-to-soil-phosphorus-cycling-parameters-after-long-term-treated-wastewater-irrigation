@@ -1,0 +1,19 @@
+ID SAMPLE,Description,Repetition,Soil (g),Volume (mL),Dilution Factor, P (absorbance), P adjusted (absorbance),P concentration (mg/L),P concentration (mg/kg),Average P  (mg/kg),SD,,,,,,,Calibration curve -  Blue method,,
+,blank,,,,,0.0498,0.04945,,,,,,,,,,,po43- (mg),Absorbance,Adjusted
+,blank,,,,,0.0491,,,,,,,,,,,,0,0.06,0
+S4,Forest - Living filterTWW irrigation,1,2.0015,20,4,0.2112,0.16175,3.773364486,37.70536584,37.3534497,0.350315801,,,,,,,1,0.409,0.247
+S4,Forest - Living filterTWW irrigation,2,2.01,20,4,0.2105,0.16105,3.757009346,37.38317757,,,,,,,,,3,0.81,0.63
+S4,Forest - Living filterTWW irrigation,3,2.0124,20,4,0.211,0.16155,3.768691589,37.45469677,,,,,,,,,5,0.928,0.868
+S4,Forest - Living filter WW irrigation,4,2.0164,20,4,0.2088,0.15935,3.71728972,36.87055862,,,,,,,,,,,
+S5,Forest - Living filter nonirrigated,1,2.0186,20,1,0.0531,0.00365,0.019859813,0.196768187,0.192379118,0.012246652,,,,,,,,,
+S5,Forest - Living filter nonirrigated,2,2.0277,20,1,0.0533,0.00385,0.021028037,0.207407776,,,,,,,,,,,
+S5,Forest - Living filter nonirrigated,3,2.015,20,1,0.0529,0.00345,0.018691589,0.185524454,,,,,,,,,,,
+S5,Forest - Living filter nonirrigated,4,2.014,20,1,0.0528,0.00335,0.018107477,0.179816054,,,,,,,,,,,
+S6,Agricultural - Living filterTWW irrigation,1,2.0047,20,1,0.1231,0.07365,0.428738318,4.277331449,4.201525705,0.061130232,,,,,,,,,
+S6,Agricultural - Living filterTWW irrigation,2,2.0176,20,1,0.1211,0.07165,0.417056075,4.134179964,,,,,,,,,,,
+S6,Agricultural - Living filterTWW irrigation,3,2.005,20,1,0.1221,0.07265,0.422897196,4.218425898,,,,,,,,,,,
+S6,Agricultural - Living filterTWW irrigation,4,2.0141,20,1,0.1217,0.07225,0.420560748,4.17616551,,,,,,,,,,,
+S7,Agricultural - Living filter nonirrigated,1,2.0072,20,1,0.0598,0.01035,0.058995327,0.587837058,0.457514768,0.126091485,,,,,,,,,
+S7,Agricultural - Living filter nonirrigated,2,2.0053,20,1,0.0574,0.00795,0.044976636,0.448577624,,,,,,,,,,,
+S7,Agricultural - Living filter nonirrigated,3,2.0158,20,1,0.0555,0.00605,0.033878505,0.336129623,,,,,,,,,,,
+S7,Agricultural - Living filter nonirrigated,4,2.0138,20,1,0.0564,0.00695,0.039135514,0.388673294,,,,,,,,,,,
