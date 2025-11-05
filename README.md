@@ -13,8 +13,9 @@ The raw data available in this repository include the following physicochemical 
 - Ferric iron
 - Water extractable P
 - P fractionation
-- P adsorption curves
+- P adsorption 
 - P desorption
+- Sorption models
 - Microbial biomass P
 - Acid phosphatase activity
 - Alkaline phosphatase activity
