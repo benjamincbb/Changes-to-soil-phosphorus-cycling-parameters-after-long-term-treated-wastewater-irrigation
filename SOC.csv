@@ -1,0 +1,19 @@
+ID SAMPLE,Description,Repetition,Dry soil (g),mL FeSO4,% OC,%OM,,,Mean SOM,SD SOM,Mean SOC,SD SOC
+,blank,,,40,,,,,,,,
+,blank,,,40,,,,,,,,
+S4,Forest - Living filterTWW irrigation,1,0.5053,4.1,4.618972294,7.963108234,,,,,,
+S4,Forest - Living filterTWW irrigation,2,0.5045,4.2,4.613410109,7.953519028,,,7.895123858,0.082850056,4.579538201,0.048056877
+S4,Forest - Living filterTWW irrigation,3,0.5126,4.4,4.515143972,7.784108208,,,,,,
+S4,Forest - Living filter WW irrigation,4,0.5078,4.3,4.570626428,7.879759961,,,,,,
+S5,Forest - Living filter nonirrigated,1,0.502,6.9,4.286713745,7.390294496,,,,,,
+S5,Forest - Living filter nonirrigated,2,0.5052,6.7,4.285298694,7.387854948,,,7.339933319,0.03324775,4.257501925,0.03324775
+S5,Forest - Living filter nonirrigated,3,0.508,7,4.223285433,7.280944087,,,,,,
+S5,Forest - Living filter nonirrigated,4,0.5097,6.8,4.234709829,7.300639746,,,,,,
+S6,Agricultural - Living filterTWW irrigation,1,1.0061,6.6,2.158268761,3.720855343,,,,,,
+S6,Agricultural - Living filterTWW irrigation,2,1.0029,6.5,2.171637751,3.743903482,,,3.724964914,0.018193484,2.160652503,0.010553065
+S6,Agricultural - Living filterTWW irrigation,3,1.0057,6.5,2.165591628,3.733479966,,,,,,
+S6,Agricultural - Living filterTWW irrigation,4,1.0083,6.7,2.147111871,3.701620866,,,,,,
+S7,Agricultural - Living filter nonirrigated,1,1.0621,6.9,2.026108935,3.493011804,,,,,,
+S7,Agricultural - Living filter nonirrigated,2,1.1061,6.78,1.952564741,3.366221613,,,3.551782167,0.150436508,2.060198473,0.087260156
+S7,Agricultural - Living filter nonirrigated,3,1.0104,6.8,2.136214964,3.682834599,,,,,,
+S7,Agricultural - Living filter nonirrigated,4,1.0153,6.8,2.12590525,3.66506065,,,,,,
