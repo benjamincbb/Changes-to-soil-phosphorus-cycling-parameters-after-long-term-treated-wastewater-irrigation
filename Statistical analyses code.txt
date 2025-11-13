@@ -1,0 +1,520 @@
+## Statistical analyses - Changes to soil phosphorus cycling parameters after long-term treated wastewater irrigation in agroforestry lands of a humid region
+
+###### S4: Forest with treated wastewater irrigation
+###### S5: Forest nonirrigation
+###### S6: Agricultural with treated wastewater irrigation
+###### S7: Agricultural nonirrigated
+
+## Load library
+
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+library(gridExtra)
+library(purrr)
+library(grid)
+
+# ---- Paths ----
+xlsx_path <- "~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RESEARCH/PENN STATE/THESIS/CHAPTER 1 - SOILS LIVING FILTER/METADATA/STAT ANALYSES/NORMALITY AND VARIANCE TEST/Alldata_statistical.xlsx"
+
+csv_out   <- "~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RESEARCH/PENN STATE/THESIS/CHAPTER 1 - SOILS LIVING FILTER/METADATA/STAT ANALYSES/NORMALITY AND VARIANCE TEST/normality_f_test_results_R.csv"
+pdf_out   <- "~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RESEARCH/PENN STATE/THESIS/CHAPTER 1 - SOILS LIVING FILTER/METADATA/STAT ANALYSES/NORMALITY AND VARIANCE TEST/normality_variance_plots_R.pdf"
+
+
+# ---- Read data ----
+df <- read_excel(xlsx_path)  # default: first sheet
+stopifnot("Soil" %in% names(df))
+
+
+# ---- Soil groups to normalized labels ----
+mapping <- c(
+  "TWWForest"          = "forest_irrigated",
+  "nonirrigatedForest" = "forest_nonirrigated",
+  "TWWAG"              = "ag_irrigated",
+  "nonirrigatedAG"     = "ag_nonirrigated"
+)
+df <- df %>%
+  mutate(
+    .group_norm = mapping[as.character(Soil)],
+    .group_norm = factor(.group_norm,
+                         levels = c("forest_irrigated","forest_nonirrigated",
+                                    "ag_irrigated","ag_nonirrigated"))
+  )
+
+# ---- Identify numeric variables ----
+num_vars <- names(df)[sapply(df, is.numeric)]
+if (length(num_vars) == 0) stop("No numeric columns found.")
+
+# ---- Comparisons ----
+
+groups_present <- na.omit(unique(df$.group_norm))
+comparisons <- list()
+if (all(c("forest_irrigated","forest_nonirrigated") %in% groups_present)) {
+  comparisons[["Forest: irrigated vs nonirrigated"]] <-
+    c("forest_irrigated", "forest_nonirrigated")
+}
+if (all(c("ag_irrigated","ag_nonirrigated") %in% groups_present)) {
+  comparisons[["Agricultural: irrigated vs nonirrigated"]] <-
+    c("ag_irrigated", "ag_nonirrigated")
+}
+if (length(comparisons) == 0) {
+  stop("Did not find both groups for either forest or agricultural comparisons.")
+}
+
+# ---- Shapiro-test ----
+shapiro_safe <- function(x) {
+  x <- x[is.finite(x)]
+  if (length(x) < 3) return(list(W = NA_real_, p = NA_real_, n = length(x)))
+  s <- shapiro.test(x)
+  list(W = unname(s$statistic), p = s$p.value, n = length(x))
+}
+
+f_test_two_sample <- function(x, y) {
+  x <- x[is.finite(x)]
+  y <- y[is.finite(y)]
+  if (length(x) < 2 || length(y) < 2) {
+    return(list(F = NA_real_, p = NA_real_,
+                var_x = ifelse(length(x) > 1, var(x), NA_real_),
+                var_y = ifelse(length(y) > 1, var(y), NA_real_),
+                n_x = length(x), n_y = length(y)))
+  }
+  # Variance two-sided F-test
+  vt <- var.test(x, y)  
+  list(F = unname(vt$statistic), p = vt$p.value,
+       var_x = var(x), var_y = var(y),
+       n_x = length(x), n_y = length(y))
+}
+
+summ_stats <- function(x) {
+  x <- x[is.finite(x)]
+  c(n = length(x),
+    mean = ifelse(length(x) > 0, mean(x), NA_real_),
+    sd = ifelse(length(x) > 1, sd(x), NA_real_))
+}
+
+# ---- Variable & comparison ----
+results <- list()
+
+for (comp_label in names(comparisons)) {
+  g1 <- comparisons[[comp_label]][1]
+  g2 <- comparisons[[comp_label]][2]
+  
+  for (v in num_vars) {
+    x <- df %>% filter(.group_norm == g1) %>% pull(all_of(v))
+    y <- df %>% filter(.group_norm == g2) %>% pull(all_of(v))
+    
+    # Shapiro test per group
+    s1 <- shapiro_safe(x)
+    s2 <- shapiro_safe(y)
+    
+    # F-test for variances
+    ft <- f_test_two_sample(x, y)
+    
+    # summaries
+    sx <- summ_stats(x)
+    sy <- summ_stats(y)
+    
+    results[[length(results) + 1]] <- data.frame(
+      variable = v,
+      comparison = comp_label,
+      group1 = g1, group2 = g2,
+      n1 = sx["n"], mean1 = sx["mean"], sd1 = sx["sd"],
+      n2 = sy["n"], mean2 = sy["mean"], sd2 = sy["sd"],
+      shapiro_W_g1 = s1$W, shapiro_p_g1 = s1$p,
+      shapiro_W_g2 = s2$W, shapiro_p_g2 = s2$p,
+      var_g1 = ft$var_x, var_g2 = ft$var_y,
+      F_stat = ft$F, F_p_two_tailed = ft$p,
+      stringsAsFactors = FALSE
+    )
+  }
+}
+
+results_df <- bind_rows(results)
+
+# ---- CSV outputs - results ----
+
+write.csv(results_df, csv_out, row.names = FALSE)
+
+# ---- Plots ----
+qq_plot <- function(vec, title) {
+  vec <- vec[is.finite(vec)]
+  if (length(vec) < 3) {
+    ggplot() + 
+      annotate("text", x = 0.5, y = 0.5, label = "n < 3 (Q–Q not shown)") +
+      labs(title = title) +
+      theme_void()
+  } else {
+    d <- data.frame(val = sort(vec))
+    # build theoretical quantiles
+    qq <- qqnorm(vec, plot.it = FALSE)
+    qq_df <- data.frame(theoretical = qq$x, sample = qq$y)
+    ggplot(qq_df, aes(x = theoretical, y = sample)) +
+      geom_point() +
+      geom_smooth(method = "lm", se = FALSE) +
+      labs(title = title, x = "Theoretical quantiles", y = "Ordered values") +
+      theme_minimal()
+  }
+}
+
+box_plot <- function(x, y, g1, g2, varname, title) {
+  dat <- tibble(
+    value = c(x, y),
+    group = factor(c(rep(g1, length(x)), rep(g2, length(y))), levels = c(g1, g2))
+  )
+  ggplot(dat, aes(group, value)) +
+    geom_boxplot(outlier.shape = 1) +
+    stat_summary(fun = "mean", geom = "point", shape = 20, size = 2) +
+    labs(title = title, x = NULL, y = varname) +
+    theme_minimal()
+}
+
+variance_bar <- function(x, y, g1, g2, title) {
+  vx <- if (length(x) > 1) var(x, na.rm = TRUE) else NA_real_
+  vy <- if (length(y) > 1) var(y, na.rm = TRUE) else NA_real_
+  dat <- tibble(group = c(g1, g2), variance = c(vx, vy))
+  ggplot(dat, aes(x = group, y = variance)) +
+    geom_col() +
+    geom_text(aes(label = ifelse(is.finite(variance), sprintf("%.4g", variance), "NA")),
+              vjust = -0.3) +
+    labs(title = title, x = NULL, y = "Sample variance") +
+    theme_minimal()
+}
+
+# ---- PDF output -  report including plots & a summary table ----
+pdf(pdf_out, width = 11, height = 8.5)  # landscape
+
+
+# Per-comparison summary table
+for (comp_label in names(comparisons)) {
+  sub <- results_df %>%
+    filter(comparison == comp_label) %>%
+    mutate(across(where(is.numeric), ~round(., 5)))
+  
+  # Split table if large
+  chunk_size <- 22
+  n_rows <- nrow(sub)
+  if (n_rows == 0) next
+  
+  for (i in seq(1, n_rows, by = chunk_size)) {
+    chunk <- sub[i:min(i + chunk_size - 1, n_rows), ]
+    grid.newpage()
+    grid.text(paste0(comp_label, " — Summary (rows ", i, "–", i + nrow(chunk) - 1, " of ", n_rows, ")"),
+              x = 0.5, y = 0.95, gp = grid::gpar(fontsize = 14, fontface = "bold"))
+    tbl <- gridExtra::tableGrob(chunk)
+    grid::grid.draw(tbl)
+  }
+}
+
+# Q–Q plots, Boxplots, Variance bars per variable & comparison
+for (comp_label in names(comparisons)) {
+  g1 <- comparisons[[comp_label]][1]
+  g2 <- comparisons[[comp_label]][2]
+  
+  for (v in num_vars) {
+    x <- df %>% filter(.group_norm == g1) %>% pull(all_of(v)) %>% as.numeric()
+    y <- df %>% filter(.group_norm == g2) %>% pull(all_of(v)) %>% as.numeric()
+    
+    p1 <- qq_plot(x, paste0(comp_label, " — ", v, "\nQ–Q: ", g1, " (n=", sum(is.finite(x)), ")"))
+    p2 <- qq_plot(y, paste0(comp_label, " — ", v, "\nQ–Q: ", g2, " (n=", sum(is.finite(y)), ")"))
+    p3 <- box_plot(x, y, g1, g2, v, paste0(comp_label, " — ", v, "\nBoxplot by group"))
+    p4 <- variance_bar(x, y, g1, g2, paste0(comp_label, " — ", v, "\nSample variances"))
+    
+    # Arrange 2x2 per variable
+    grid.newpage()
+    gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
+  }
+}
+
+dev.off()
+
+message("Saved files:\n  CSV: ", csv_out, "\n  PDF: ", pdf_out)
+
+
+# ------- Welch t-test -------
+
+
+library(tidyverse)
+
+
+#### -----a. Function red.table to convert the file .txt to dataframe -----
+
+
+
+results_s4tos5 <- read.table("Stat_S4toS5.txt", header=TRUE, row.names = NULL)
+results_s6tos7<- read.table("Stat_S6toS7.txt", header=TRUE, row.names = NULL)
+
+### -----b. t-test ---------
+
+
+t.test(pH ~ Soil, data = results_s4tos5, conf.level = 0.95)
+t.test(EC ~ Soil, data = results_s4tos5, conf.level = 0.95)
+t.test(Fe2 ~ Soil, data = results_s4tos5, conf.level = 0.95)
+t.test(Fe3 ~ Soil, data = results_s4tos5, conf.level = 0.95)
+t.test(WPO4 ~ Soil, data = results_s4tos5, conf.level = 0.95)
+t.test(Alk ~ Soil, data = results_s4tos5, conf.level = 0.95)
+t.test(Ac ~ Soil, data = results_s4tos5, conf.level = 0.95)
+t.test(Pyro ~ Soil, data = results_s4tos5, conf.level = 0.95)
+t.test(FI ~ Soil, data = results_s4tos5, conf.level = 0.95)
+t.test(FII ~ Soil, data = results_s4tos5, conf.level = 0.95)
+t.test(FIII ~ Soil, data = results_s4tos5, conf.level = 0.95)
+t.test(FIV ~ Soil, data = results_s4tos5, conf.level = 0.95)
+t.test(FV ~ Soil, data = results_s4tos5, conf.level = 0.95)
+t.test(MP ~ Soil, data = results_s4tos5, conf.level = 0.95)
+t.test(SOC ~ Soil, data = results_s4tos5, conf.level = 0.95)
+
+
+t.test(pH ~ Soil, data = results_s6tos7, conf.level = 0.95)
+t.test(EC ~ Soil, data = results_s6tos7, conf.level = 0.95)
+t.test(Fe2 ~ Soil, data = results_s6tos7, conf.level = 0.95)
+t.test(Fe3 ~ Soil, data = results_s6tos7, conf.level = 0.95)
+t.test(WPO4 ~ Soil, data = results_s6tos7, conf.level = 0.95)
+t.test(Alk ~ Soil, data = results_s6tos7, conf.level = 0.95)
+t.test(Ac ~ Soil, data = results_s6tos7, conf.level = 0.95)
+t.test(Pyro ~ Soil, data = results_s6tos7, conf.level = 0.95)
+t.test(FI ~ Soil, data = results_s6tos7, conf.level = 0.95)
+t.test(FII ~ Soil, data = results_s6tos7, conf.level = 0.95)
+t.test(FIII ~ Soil, data = results_s6tos7, conf.level = 0.95)
+t.test(FIV ~ Soil, data = results_s6tos7, conf.level = 0.95)
+t.test(FV ~ Soil, data = results_s6tos7, conf.level = 0.95)
+t.test(MP ~ Soil, data = results_s6tos7, conf.level = 0.95)
+t.test(SOC ~ Soil, data = results_s6tos7, conf.level = 0.95)
+
+###########################################################################
+
+#PCA analysis
+
+
+#### a. Install and load libraries for analyses
+
+install.packages("cluster")
+install.packages("devtools")
+devtools::install_github("kassambara/factoextra")
+install.packages("factoextra")
+install.packages(c("cluster", "factoextra"))
+install.packages("FactoMineR")
+install.packages("factoextra")
+install.packages("usethis")
+install.packages("corrplot")
+
+
+library(cluster)
+library(ggplot2)
+library(devtools)
+library(factoextra)
+library(FactoMineR)
+library(corrplot)
+library(ade4)
+library(RColorBrewer)
+library(gplots)
+library(plyr)
+library(gdata)
+library(ggplot2)
+library(Hmisc)
+library(reshape2)
+library(cowplot)
+library(lattice)
+library(ggprism)
+library(ggpubr)
+
+
+### b. Load data por PCA analysis
+
+#directory
+
+setwd("/Users/benjacastillo/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RESEARCH/PENN STATE/COMPREHENSIVE/CHAPTER 1 - SOILS LIVING FILTER/METADATA/STAT ANALYSES")
+
+#load data
+
+
+metadatasPCA <- read.table("MetadataPCA.txt", sep="\t", header=T, row.names=1)
+results <- read.delim("ResultsPCA.txt",header=T, row.names=1)
+
+metadatasPCA_irrigated <- read.table("MetadataPCA_irrigated.txt", sep="\t", header=T, row.names=1)
+results_irrigated <- read.delim("ResultsPCA_irrigated.txt",header=T, row.names=1)                    
+
+metadatasPCA_nonirrigated <- read.table("MetadataPCA_nonirrigated.txt", sep="\t", header=T, row.names=1)
+results_nonirrigated <- read.delim("ResultsPCA_nonirrigated.txt",header=T, row.names=1)
+        
+
+metadatasPCA_forest <- read.table("MetadataPCA_forest.txt", sep="\t", header=T, row.names=1)
+results_forest <- read.delim("ResultsPCA_forest.txt",header=T, row.names=1)
+
+metadatasPCA_agri <- read.table("MetadataPCA_agri.txt", sep="\t", header=T, row.names=1)
+results_agri <- read.delim("ResultsPCA_agri.txt",header=T, row.names=1)
+
+pcatests <- read.delim("pcatest.txt", sep="\t", header=T, row.names=1)
+              
+##b correlation.
+
+cor.mat <- round(cor(results),2)
+head(cor.mat[, 1:16])
+
+
+testRes <- cor.mtest(results, conf.level = 0.95)
+
+
+correlation <- corrplot(cor.mat, type="upper", order="hclust", p.mat = testRes$p, 
+         tl.col="black", tl.srt=45,  sig.level = c(0.05), pch.cex = 2.8,
+         insig = 'label_sig', pch.col = 'white')
+
+correlation
+
+#setwd("~/Downloads")
+setwd("C:/Users/Benjamin Castillo/Downloads")
+ggsave("correlationplot2.pdf", dpi = 600, width = 8, height = 5.5, units = c("in"))
+ggsave("Biplot_PCA23.jpg", dpi = 600, width = 8, height = 5.5, units = c("in"))
+dev.off()
+
+
+##correlation for soils - FOREST
+
+cor.mat_f <- round(cor(results_forest),2)
+
+
+head(cor.mat_f[, 1:16])
+
+
+testRes_f <- cor.mtest(results_forest, conf.level = 0.95)
+
+
+correlation_f <- corrplot(cor.mat_f, type="upper", order="hclust", p.mat = testRes_f$p, 
+                        tl.col="black", tl.srt=45,  sig.level = c(0.05), pch.cex = 2.5,
+                        insig = 'label_sig', pch.col = 'white')
+
+correlation_i
+
+#setwd("~/Downloads")
+setwd("C:/Users/Benjamin Castillo/Downloads")
+ggsave("correlationplot2.pdf", dpi = 600, width = 8, height = 5.5, units = c("in"))
+ggsave("Biplot_PCA23.jpg", dpi = 600, width = 8, height = 5.5, units = c("in"))
+dev.off()
+
+
+
+##correlation for soils nonirrigated
+
+cor.mat_non <- round(cor(results_nonirrigated),2)
+head(cor.mat_non[, 1:16])
+
+
+testRes_non <- cor.mtest(results_nonirrigated, conf.level = 0.95)
+
+
+correlation_i <- corrplot(cor.mat_i, type="upper", order="hclust", p.mat = testRes_i$p, 
+                          tl.col="black", tl.srt=45,  sig.level = c(0.05), pch.cex = 2.5,
+                          insig = 'label_sig', pch.col = 'white')
+
+correlation_i
+
+
+
+
+##c Calculate principal components
+
+PCA_result <- PCA(results,scale.unit=TRUE,ncp=5,ind.sup=NULL, quanti.sup=NULL,quali.sup=NULL,row.w=NULL, col.w=NULL,graph=TRUE,axes=c(1,2))
+
+
+## d. Calculate eigenvalues/variances 
+
+
+eig.val <- get_eigenvalue(PCA_result)
+eig.val
+
+
+## e. Scree plot to determine the number of principal components.
+
+
+fviz_eig(PCA_result, addlabels = TRUE, ylim = c(0, 100))
+
+
+##f. Graph of variables
+
+var <- get_pca_var(PCA_result)
+var
+
+# Coordinates
+head(var$coord)
+# Cos2: quality on the factore map
+head(var$cos2)
+# Contributions to the principal components
+contribution <- head(var$contrib)
+contribution
+## g. variable correlation plots
+
+fviz_pca_var(PCA_result, col.var = "black")
+
+## Positively correlated variab,es are agrouped together and negatively correlated variables are positioned on opposite sides of the plot origin.
+# the distance between the variables and the origin measures the quality of the variables on the factor map. Variables that are away from the origin are well represent on the factor map
+
+
+## h. visualize the cos2 of variables on all the dimension using the corrplot package
+
+corrplot(var$cos2, is.corr=FALSE) # or using the barplot
+
+fviz_cos2(PCA_result, choice = "var", axes = 1)
+fviz_cos2(PCA_result, choice = "var", axes = 2)#A high Cos2 indicates a good representation of the variable on the Principal component. Therefore, the variable a positioned close to the circumference of the correlation circle. In case of v=having a low co2 indicates the variable is not perfectly represent by the PC (variable close to the center of the circle)
+
+
+# Color by cos2 values: quality on the factor map
+
+fviz_pca_var(PCA_result, col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE ) # Avoid text overlapping )
+
+
+## Plots: quality and contribution
+
+
+fviz_pca_ind(PCA_result)
+
+fviz_pca_ind(PCA_result, col.ind = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE) # Avoid text overlapping (slow if many points) )
+fviz_pca_ind(PCA_result, pointsize = "cos2", pointshape = 21, fill = "#E7B800",
+             repel = TRUE) # Avoid text overlapping (slow if many points) )
+
+
+
+# Total contribution on PC1 and PC2
+fviz_contrib(PCA_result, choice = "ind", axes = 1)
+fviz_contrib(PCA_result, choice = "ind", axes = 2)
+fviz_contrib(PCA_result, choice = "var", axes = 1)
+
+fviz_contrib(PCA_result, choice = "var", axes = 2)
+
+
+## color by groups
+
+fviz_pca_biplot(PCA_result,
+             geom.ind = "point", # show points only (nbut not "text") 
+             col.ind = metadatasPCA$Treatment, # color by groups
+             palette = c("#00AFBB", "#E7B800", "#FC4E07","grey" ), addEllipses = TRUE, # Concentration ellipses legend.title = "Groups"
+)
+
+
+## biplot
+
+Biplot_PCA<- fviz_pca_biplot(PCA_result, axes=c(1,2),
+                fill.ind = metadatasPCA$Treatment,col.ind=metadatasPCA$Treatment, palette = "jco", pointshape=21, pointsize=2,
+                addEllipses = TRUE, ellipse.level = 0.95, label = "var",
+                col.var = "black", repel = TRUE,
+                legend.title = "Soil")
+
+
+Biplot_PCA2 <- Biplot_PCA+ theme(panel.background = element_blank(), 
+                                 panel.border = element_rect(colour = "black", fill = NA, size = 0.5), axis.text=element_text(color='black', size=13, face='plain'), axis.title=element_text(size=13, face='plain', color='black'), legend.title = element_text(size = 13, face='plain', color='black'))+
+
+labs(x='PC1 (58.2%)', y= 'PC2 (29.8%)') ## CHANGE THIS ACCORDING TO THE PREVIOUS % YOU GOT
+
+
+Biplot_PCA2
+
+
+setwd("~/Downloads")
+
+ggsave("Biplot_PCA2.pdf", dpi = 600, width = 8, height = 5.5, units = c("in"))
+ggsave("Biplot_PCA2.jpg", dpi = 600, width = 8, height = 5.5, units = c("in"))
+dev.off()
+
