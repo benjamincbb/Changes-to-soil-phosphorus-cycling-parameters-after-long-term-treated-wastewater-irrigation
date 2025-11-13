@@ -15,6 +15,7 @@ library(ggplot2)
 library(gridExtra)
 library(purrr)
 library(grid)
+library(car)
 
 # ---- Paths ----
 xlsx_path <- "path/Alldata_statistical.xlsx"
@@ -24,9 +25,8 @@ pdf_out   <- "~/path/normality_variance_plots_R.pdf"
 
 
 # ---- Read data ----
-df <- read_excel(xlsx_path)  # default: first sheet
+df <- read_excel(xlsx_path)
 stopifnot("Soil" %in% names(df))
-
 
 # ---- Soil groups to normalized labels ----
 mapping <- c(
@@ -39,8 +39,7 @@ df <- df %>%
   mutate(
     .group_norm = mapping[as.character(Soil)],
     .group_norm = factor(.group_norm,
-                         levels = c("forest_irrigated","forest_nonirrigated",
-                                    "ag_irrigated","ag_nonirrigated"))
+      levels = c("forest_irrigated","forest_nonirrigated","ag_irrigated","ag_nonirrigated"))
   )
 
 # ---- Identify numeric variables ----
@@ -48,22 +47,17 @@ num_vars <- names(df)[sapply(df, is.numeric)]
 if (length(num_vars) == 0) stop("No numeric columns found.")
 
 # ---- Comparisons ----
-
 groups_present <- na.omit(unique(df$.group_norm))
 comparisons <- list()
 if (all(c("forest_irrigated","forest_nonirrigated") %in% groups_present)) {
-  comparisons[["Forest: irrigated vs nonirrigated"]] <-
-    c("forest_irrigated", "forest_nonirrigated")
+  comparisons[["Forest: irrigated vs nonirrigated"]] <- c("forest_irrigated", "forest_nonirrigated")
 }
 if (all(c("ag_irrigated","ag_nonirrigated") %in% groups_present)) {
-  comparisons[["Agricultural: irrigated vs nonirrigated"]] <-
-    c("ag_irrigated", "ag_nonirrigated")
+  comparisons[["Agricultural: irrigated vs nonirrigated"]] <- c("ag_irrigated", "ag_nonirrigated")
 }
-if (length(comparisons) == 0) {
-  stop("Did not find both groups for either forest or agricultural comparisons.")
-}
+if (length(comparisons) == 0) stop("Did not find both groups for either forest or agricultural comparisons.")
 
-# ---- Shapiro-test ----
+# ---- Shapiro (per group) ----
 shapiro_safe <- function(x) {
   x <- x[is.finite(x)]
   if (length(x) < 3) return(list(W = NA_real_, p = NA_real_, n = length(x)))
@@ -71,20 +65,12 @@ shapiro_safe <- function(x) {
   list(W = unname(s$statistic), p = s$p.value, n = length(x))
 }
 
-f_test_two_sample <- function(x, y) {
-  x <- x[is.finite(x)]
-  y <- y[is.finite(y)]
-  if (length(x) < 2 || length(y) < 2) {
-    return(list(F = NA_real_, p = NA_real_,
-                var_x = ifelse(length(x) > 1, var(x), NA_real_),
-                var_y = ifelse(length(y) > 1, var(y), NA_real_),
-                n_x = length(x), n_y = length(y)))
-  }
-  # Variance two-sided F-test
-  vt <- var.test(x, y)  
-  list(F = unname(vt$statistic), p = vt$p.value,
-       var_x = var(x), var_y = var(y),
-       n_x = length(x), n_y = length(y))
+# ---- Levene/Brown–Forsythe (median-based) ----
+levene_bf <- function(x, y) {
+  vx <- x[is.finite(x)]; vy <- y[is.finite(y)]
+  if (length(vx) + length(vy) < 4 || length(vx) < 2 || length(vy) < 2) return(NA_real_)
+  dat <- data.frame(val = c(vx, vy), grp = factor(c(rep("g1", length(vx)), rep("g2", length(vy)))))
+  car::leveneTest(val ~ grp, data = dat, center = median)[["Pr(>F)"]][1]
 }
 
 summ_stats <- function(x) {
@@ -94,28 +80,30 @@ summ_stats <- function(x) {
     sd = ifelse(length(x) > 1, sd(x), NA_real_))
 }
 
-# ---- Variable & comparison ----
+# ---- Main loop: variable × comparison ----
 results <- list()
-
 for (comp_label in names(comparisons)) {
   g1 <- comparisons[[comp_label]][1]
   g2 <- comparisons[[comp_label]][2]
-  
   for (v in num_vars) {
     x <- df %>% filter(.group_norm == g1) %>% pull(all_of(v))
     y <- df %>% filter(.group_norm == g2) %>% pull(all_of(v))
-    
-    # Shapiro test per group
+
+    # Shapiro per group
     s1 <- shapiro_safe(x)
     s2 <- shapiro_safe(y)
-    
-    # F-test for variances
-    ft <- f_test_two_sample(x, y)
-    
-    # summaries
+
+    # Levene/Brown–Forsythe p-value (homogeneity of variances)
+    lev_p <- levene_bf(x, y)
+
+    # Sample variances for plotting
+    var_x <- if (sum(is.finite(x)) > 1) var(x, na.rm = TRUE) else NA_real_
+    var_y <- if (sum(is.finite(y)) > 1) var(y, na.rm = TRUE) else NA_real_
+
+    # Group summaries
     sx <- summ_stats(x)
     sy <- summ_stats(y)
-    
+
     results[[length(results) + 1]] <- data.frame(
       variable = v,
       comparison = comp_label,
@@ -124,20 +112,18 @@ for (comp_label in names(comparisons)) {
       n2 = sy["n"], mean2 = sy["mean"], sd2 = sy["sd"],
       shapiro_W_g1 = s1$W, shapiro_p_g1 = s1$p,
       shapiro_W_g2 = s2$W, shapiro_p_g2 = s2$p,
-      var_g1 = ft$var_x, var_g2 = ft$var_y,
-      F_stat = ft$F, F_p_two_tailed = ft$p,
+      var_g1 = var_x, var_g2 = var_y,
+      levene_BF_p = lev_p,                         # <— replaces F-test
       stringsAsFactors = FALSE
     )
   }
 }
-
 results_df <- bind_rows(results)
 
-# ---- CSV outputs - results ----
-
+# ---- Save CSV ----
 write.csv(results_df, csv_out, row.names = FALSE)
 
-# ---- Plots ----
+# ---- Plot helpers (unchanged) ----
 qq_plot <- function(vec, title) {
   vec <- vec[is.finite(vec)]
   if (length(vec) < 3) {
@@ -146,8 +132,6 @@ qq_plot <- function(vec, title) {
       labs(title = title) +
       theme_void()
   } else {
-    d <- data.frame(val = sort(vec))
-    # build theoretical quantiles
     qq <- qqnorm(vec, plot.it = FALSE)
     qq_df <- data.frame(theoretical = qq$x, sample = qq$y)
     ggplot(qq_df, aes(x = theoretical, y = sample)) +
@@ -182,21 +166,16 @@ variance_bar <- function(x, y, g1, g2, title) {
     theme_minimal()
 }
 
-# ---- PDF output -  report including plots & a summary table ----
+# ---- PDF report (summary table + diagnostics) ----
 pdf(pdf_out, width = 11, height = 8.5)  # landscape
 
-
-# Per-comparison summary table
 for (comp_label in names(comparisons)) {
   sub <- results_df %>%
     filter(comparison == comp_label) %>%
     mutate(across(where(is.numeric), ~round(., 5)))
-  
-  # Split table if large
   chunk_size <- 22
   n_rows <- nrow(sub)
   if (n_rows == 0) next
-  
   for (i in seq(1, n_rows, by = chunk_size)) {
     chunk <- sub[i:min(i + chunk_size - 1, n_rows), ]
     grid.newpage()
@@ -207,21 +186,16 @@ for (comp_label in names(comparisons)) {
   }
 }
 
-# Q–Q plots, Boxplots, Variance bars per variable & comparison
 for (comp_label in names(comparisons)) {
   g1 <- comparisons[[comp_label]][1]
   g2 <- comparisons[[comp_label]][2]
-  
   for (v in num_vars) {
     x <- df %>% filter(.group_norm == g1) %>% pull(all_of(v)) %>% as.numeric()
     y <- df %>% filter(.group_norm == g2) %>% pull(all_of(v)) %>% as.numeric()
-    
     p1 <- qq_plot(x, paste0(comp_label, " — ", v, "\nQ–Q: ", g1, " (n=", sum(is.finite(x)), ")"))
     p2 <- qq_plot(y, paste0(comp_label, " — ", v, "\nQ–Q: ", g2, " (n=", sum(is.finite(y)), ")"))
     p3 <- box_plot(x, y, g1, g2, v, paste0(comp_label, " — ", v, "\nBoxplot by group"))
     p4 <- variance_bar(x, y, g1, g2, paste0(comp_label, " — ", v, "\nSample variances"))
-    
-    # Arrange 2x2 per variable
     grid.newpage()
     gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
   }
