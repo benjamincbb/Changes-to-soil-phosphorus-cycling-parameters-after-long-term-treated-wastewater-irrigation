@@ -5,8 +5,7 @@
 ###### S6: Agricultural with treated wastewater irrigation
 ###### S7: Agricultural nonirrigated
 
-## Load library
-
+# ---- Libraries ----
 library(readxl)
 library(dplyr)
 library(tidyr)
@@ -15,14 +14,14 @@ library(ggplot2)
 library(gridExtra)
 library(purrr)
 library(grid)
+# NEW: for Levene/Brown–Forsythe
+if (!requireNamespace("car", quietly = TRUE)) install.packages("car")
 library(car)
 
 # ---- Paths ----
-xlsx_path <- "path/Alldata_statistical.xlsx"
-
-csv_out   <- "~/path/normality_f_test_results_R.csv"
-pdf_out   <- "~/path/normality_variance_plots_R.pdf"
-
+xlsx_path <- "~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RESEARCH/PENN STATE/THESIS/CHAPTER 1 - SOILS LIVING FILTER/METADATA/STAT ANALYSES/NORMALITY AND VARIANCE TEST/Alldata_statistical.xlsx"
+csv_out   <- "~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RESEARCH/PENN STATE/THESIS/CHAPTER 1 - SOILS LIVING FILTER/METADATA/STAT ANALYSES/NORMALITY AND VARIANCE TEST/normality_levene_results_R.csv"
+pdf_out   <- "~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RESEARCH/PENN STATE/THESIS/CHAPTER 1 - SOILS LIVING FILTER/METADATA/STAT ANALYSES/NORMALITY AND VARIANCE TEST/normality_variance_plots_R.pdf"
 
 # ---- Read data ----
 df <- read_excel(xlsx_path)
@@ -39,7 +38,7 @@ df <- df %>%
   mutate(
     .group_norm = mapping[as.character(Soil)],
     .group_norm = factor(.group_norm,
-      levels = c("forest_irrigated","forest_nonirrigated","ag_irrigated","ag_nonirrigated"))
+                         levels = c("forest_irrigated","forest_nonirrigated","ag_irrigated","ag_nonirrigated"))
   )
 
 # ---- Identify numeric variables ----
@@ -88,22 +87,22 @@ for (comp_label in names(comparisons)) {
   for (v in num_vars) {
     x <- df %>% filter(.group_norm == g1) %>% pull(all_of(v))
     y <- df %>% filter(.group_norm == g2) %>% pull(all_of(v))
-
+    
     # Shapiro per group
     s1 <- shapiro_safe(x)
     s2 <- shapiro_safe(y)
-
+    
     # Levene/Brown–Forsythe p-value (homogeneity of variances)
     lev_p <- levene_bf(x, y)
-
+    
     # Sample variances for plotting
     var_x <- if (sum(is.finite(x)) > 1) var(x, na.rm = TRUE) else NA_real_
     var_y <- if (sum(is.finite(y)) > 1) var(y, na.rm = TRUE) else NA_real_
-
+    
     # Group summaries
     sx <- summ_stats(x)
     sy <- summ_stats(y)
-
+    
     results[[length(results) + 1]] <- data.frame(
       variable = v,
       comparison = comp_label,
@@ -206,54 +205,143 @@ dev.off()
 message("Saved files:\n  CSV: ", csv_out, "\n  PDF: ", pdf_out)
 
 
+
+# ------- Levene's test -----
+
+# -------- Levene (Brown–Forsythe) for your data frames --------
+# Installs if needed:
+if (!requireNamespace("car", quietly = TRUE)) install.packages("car")
+if (!requireNamespace("dplyr", quietly = TRUE)) install.packages("dplyr")
+
+library(car)
+library(dplyr)
+
+# Variables to check
+vars <- c("pH","EC","Fe2","Fe3","WPO4","Alk","Ac","Pyro","FI","FII","FIII","FIV","FV","MP","SOC")
+alpha <- 0.05
+
+# Helper: run BF-Levene for one pairwise data.frame that already has the two Soil levels
+levene_pair <- function(dat, pair_label) {
+  dat <- dat %>% dplyr::filter(!is.na(Soil)) %>% droplevels()
+  stopifnot(nlevels(dat$Soil) == 2)
+  
+  out <- lapply(vars, function(v) {
+    tmp <- data.frame(val = dat[[v]], grp = dat$Soil)
+    tmp <- tmp[is.finite(tmp$val) & !is.na(tmp$grp), ]
+    if (length(unique(tmp$grp)) < 2 || nrow(tmp) < 4) {
+      p <- NA_real_
+    } else {
+      p <- car::leveneTest(val ~ grp, data = tmp, center = median)[["Pr(>F)"]][1]
+    }
+    data.frame(
+      comparison = pair_label,
+      variable   = v,
+      levene_BF_p = p,
+      homogeneous = ifelse(is.na(p), NA, p >= alpha),
+      stringsAsFactors = FALSE
+    )
+  })
+  do.call(rbind, out)
+}
+
+# ---- Run for your two pairwise data.frames ----
+# Forest: s5 = nonirrigatedForest, s4 = TWWForest
+lev_forest <- levene_pair(results_s4tos5, "Forest: irrigated vs nonirrigated")
+
+# Ag: s7 = nonirrigatedAG, s6 = TWWAG
+lev_ag     <- levene_pair(results_s6tos7, "Agricultural: irrigated vs nonirrigated")
+
+levene_results <- dplyr::bind_rows(lev_forest, lev_ag) %>%
+  dplyr::arrange(comparison, variable)
+
+print(levene_results, row.names = FALSE)
+write.csv(levene_results, "/mnt/data/levene_brown_forsythe_results.csv", row.names = FALSE)
+
+
+
+
+
 # ------- Welch t-test -------
 
+library(readxl)
+library(dplyr)
 
-library(tidyverse)
+# ---- Path to your Excel file (EDIT if needed) ----
+xlsx_path <- "~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RESEARCH/PENN STATE/THESIS/CHAPTER 1 - SOILS LIVING FILTER/METADATA/STAT ANALYSES/NORMALITY AND VARIANCE TEST/Alldata_statistical.xlsx"   # <- put your actual path here
+out_csv   <- "~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RESEARCH/PENN STATE/THESIS/CHAPTER 1 - SOILS LIVING FILTER/METADATA/STAT ANALYSES/NORMALITY AND VARIANCE TEST/welch_ttests_from_alldata.csv"
 
-
-#### -----a. Function red.table to convert the file .txt to dataframe -----
-
-
-
-results_s4tos5 <- read.table("Stat_S4toS5.txt", header=TRUE, row.names = NULL)
-results_s6tos7<- read.table("Stat_S6toS7.txt", header=TRUE, row.names = NULL)
-
-### -----b. t-test ---------
+# ---- Read ----
+df <- read_excel(xlsx_path)
+stopifnot("Soil" %in% names(df))
 
 
-t.test(pH ~ Soil, data = results_s4tos5, conf.level = 0.95)
-t.test(EC ~ Soil, data = results_s4tos5, conf.level = 0.95)
-t.test(Fe2 ~ Soil, data = results_s4tos5, conf.level = 0.95)
-t.test(Fe3 ~ Soil, data = results_s4tos5, conf.level = 0.95)
-t.test(WPO4 ~ Soil, data = results_s4tos5, conf.level = 0.95)
-t.test(Alk ~ Soil, data = results_s4tos5, conf.level = 0.95)
-t.test(Ac ~ Soil, data = results_s4tos5, conf.level = 0.95)
-t.test(Pyro ~ Soil, data = results_s4tos5, conf.level = 0.95)
-t.test(FI ~ Soil, data = results_s4tos5, conf.level = 0.95)
-t.test(FII ~ Soil, data = results_s4tos5, conf.level = 0.95)
-t.test(FIII ~ Soil, data = results_s4tos5, conf.level = 0.95)
-t.test(FIV ~ Soil, data = results_s4tos5, conf.level = 0.95)
-t.test(FV ~ Soil, data = results_s4tos5, conf.level = 0.95)
-t.test(MP ~ Soil, data = results_s4tos5, conf.level = 0.95)
-t.test(SOC ~ Soil, data = results_s4tos5, conf.level = 0.95)
+# ---- Variables to test ----
+vars <- c("pH","EC","Fe2","Fe3","WPO4","Alk","Ac","Pyro",
+          "FI","FII","FIII","FIV","FV","MP","SOC")
+
+# Helper to coerce to numeric safely
+numify <- function(x) suppressWarnings(as.numeric(as.character(x)))
+
+# ---- Build the two pairwise subsets from the full data ----
+forest_pair <- df %>%
+  filter(Soil %in% c("nonirrigatedForest","TWWForest")) %>%
+  mutate(Soil = factor(Soil, levels = c("nonirrigatedForest","TWWForest"))) %>%
+  mutate(across(all_of(vars), numify)) %>%
+  droplevels()
+
+ag_pair <- df %>%
+  filter(Soil %in% c("nonirrigatedAG","TWWAG")) %>%
+  mutate(Soil = factor(Soil, levels = c("nonirrigatedAG","TWWAG"))) %>%
+  mutate(across(all_of(vars), numify)) %>%
+  droplevels()
+
+# ---- Welch test for all vars in a two-level data.frame ----
+run_welch_block <- function(dat, label, vars) {
+  stopifnot(nlevels(dat$Soil) == 2)
+  g1 <- levels(dat$Soil)[1]   # nonirrigated
+  g2 <- levels(dat$Soil)[2]   # irrigated
+  
+  # keep only vars that have at least some finite numbers
+  keep <- vars[sapply(dat[vars], function(col) any(is.finite(col)))]
+  if (length(setdiff(vars, keep))) {
+    message("Dropped vars with no numeric data: ",
+            paste(setdiff(vars, keep), collapse = ", "))
+  }
+  
+  do.call(rbind, lapply(keep, function(v) {
+    f  <- as.formula(paste(v, "~ Soil"))
+    tt <- t.test(f, data = dat, var.equal = FALSE, conf.level = 0.95)  # Welch
+    
+    data.frame(
+      comparison = label,
+      variable   = v,
+      method     = tt$method,                         # "Welch Two Sample t-test"
+      mean_diff  = unname(diff(rev(tt$estimate))),    # level2 - level1 (irrigated - nonirrigated)
+      conf_low   = tt$conf.int[1],
+      conf_high  = tt$conf.int[2],
+      t          = unname(tt$statistic),
+      df         = unname(tt$parameter),
+      p_value    = tt$p.value,
+      group1     = g1,
+      mean1      = mean(dat[dat$Soil == g1, v, drop=TRUE], na.rm = TRUE),
+      group2     = g2,
+      mean2      = mean(dat[dat$Soil == g2, v, drop=TRUE], na.rm = TRUE),
+      stringsAsFactors = FALSE
+    )
+  }))
+}
+
+# ---- Welch test for both pairs ----
+res_forest <- run_welch_block(forest_pair, "Forest: irrigated vs nonirrigated", vars)
+res_ag     <- run_welch_block(ag_pair,     "Agricultural: irrigated vs nonirrigated", vars)
+
+results <- bind_rows(res_forest, res_ag) %>%
+  arrange(comparison, variable)
+
+# ---- Save ----
+write.csv(results, out_csv, row.names = FALSE)
 
 
-t.test(pH ~ Soil, data = results_s6tos7, conf.level = 0.95)
-t.test(EC ~ Soil, data = results_s6tos7, conf.level = 0.95)
-t.test(Fe2 ~ Soil, data = results_s6tos7, conf.level = 0.95)
-t.test(Fe3 ~ Soil, data = results_s6tos7, conf.level = 0.95)
-t.test(WPO4 ~ Soil, data = results_s6tos7, conf.level = 0.95)
-t.test(Alk ~ Soil, data = results_s6tos7, conf.level = 0.95)
-t.test(Ac ~ Soil, data = results_s6tos7, conf.level = 0.95)
-t.test(Pyro ~ Soil, data = results_s6tos7, conf.level = 0.95)
-t.test(FI ~ Soil, data = results_s6tos7, conf.level = 0.95)
-t.test(FII ~ Soil, data = results_s6tos7, conf.level = 0.95)
-t.test(FIII ~ Soil, data = results_s6tos7, conf.level = 0.95)
-t.test(FIV ~ Soil, data = results_s6tos7, conf.level = 0.95)
-t.test(FV ~ Soil, data = results_s6tos7, conf.level = 0.95)
-t.test(MP ~ Soil, data = results_s6tos7, conf.level = 0.95)
-t.test(SOC ~ Soil, data = results_s6tos7, conf.level = 0.95)
 
 ###########################################################################
 
