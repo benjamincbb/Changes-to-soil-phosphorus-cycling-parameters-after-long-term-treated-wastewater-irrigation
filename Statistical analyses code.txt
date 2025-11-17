@@ -14,14 +14,12 @@ library(ggplot2)
 library(gridExtra)
 library(purrr)
 library(grid)
-# NEW: for Levene/Brown–Forsythe
-if (!requireNamespace("car", quietly = TRUE)) install.packages("car")
 library(car)
 
 # ---- Paths ----
-xlsx_path <- "~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RESEARCH/PENN STATE/THESIS/CHAPTER 1 - SOILS LIVING FILTER/METADATA/STAT ANALYSES/NORMALITY AND VARIANCE TEST/Alldata_statistical.xlsx"
-csv_out   <- "~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RESEARCH/PENN STATE/THESIS/CHAPTER 1 - SOILS LIVING FILTER/METADATA/STAT ANALYSES/NORMALITY AND VARIANCE TEST/normality_levene_results_R.csv"
-pdf_out   <- "~/Library/CloudStorage/OneDrive-ThePennsylvaniaStateUniversity/RESEARCH/PENN STATE/THESIS/CHAPTER 1 - SOILS LIVING FILTER/METADATA/STAT ANALYSES/NORMALITY AND VARIANCE TEST/normality_variance_plots_R.pdf"
+xlsx_path <- "~path/Alldata_statistical.xlsx"
+csv_out   <- "~path/normality_levene_results_R.csv"
+pdf_out   <- "~path/normality_variance_plots_R.pdf"
 
 # ---- Read data ----
 df <- read_excel(xlsx_path)
